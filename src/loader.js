@@ -47,7 +47,7 @@ export class ESMLoader {
             const resp = await fetch(url);
 
             const mime = resp.headers.get("Content-Type")?.split(";")[0] ?? "";
-            console.log(mime);
+            //console.log(mime);
             if (mime in ESMLoader.#mimeBinging) {
                 
                 this.#pendingImports.set(id, {
