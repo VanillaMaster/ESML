@@ -1,21 +1,12 @@
 export const META = Symbol("meta");
 const AsyncFunction = (async function(){}).constructor;
 
-/**
- * @returns {Generator<number, never, void>}
- */
-function* idGen(){
-    let i = 0;
-    while (true) { yield i++; }
-}
-
 export class ESMLoader {
     constructor(){
         this.#worker.addEventListener("message", ESMLoader.onMessage.bind(this));
     }
     /**@type { Map<string, ESML.module> } */
     #cache = new Map();
-    #id = idGen();
 
     /**
      * @param { string } request 
