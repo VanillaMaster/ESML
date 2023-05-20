@@ -3,7 +3,7 @@ const AsyncFunction = (async function(){}).constructor;
 
 export class ESMLoader {
     constructor(){
-        this.#worker.addEventListener("message", ESMLoader.onMessage.bind(this));
+        this.#parser.addEventListener("message", ESMLoader.onMessage.bind(this));
     }
     /**@type { Map<string, ESML.module> } */
     #cache = new Map();
@@ -68,7 +68,7 @@ export class ESMLoader {
             const buffer = await response.arrayBuffer();
 
             console.time(`module (${id}) parse time`)
-            this.#worker.postMessage({ data: buffer, id: id }, [buffer]);
+            this.#parser.postMessage({ data: buffer, id: id }, [buffer]);
         }
 
         this.#mimeBinging["application/javascript"] = loadJavaScript;
@@ -79,7 +79,7 @@ export class ESMLoader {
     /**@type { Map<string, { entries: { resolve: (value: ESML.module) => void; reject: (reason?: any) => void; }[]; location: URL }> } */
     #pendingImports = new Map();
 
-    #worker = new Worker(new URL("./parser.js", import.meta.url));
+    #parser = new Worker(new URL("./parser.js", import.meta.url));
 
     /**
      * @private
