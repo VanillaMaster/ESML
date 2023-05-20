@@ -1,0 +1,9 @@
+{
+    "compilerOptions": {
+        "checkJs": true,
+        "target": "ES2022",
+        "moduleResolution": "classic",
+        "module": "ESNext",
+        "strict": true
+    }
+}
