@@ -23,3 +23,4 @@ const module = await loader.import("./a.js");
 todo:
  - implement import map
  - implement module resolution scopes
+ - fix dynamic import

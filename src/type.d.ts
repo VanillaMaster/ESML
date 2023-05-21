@@ -11,4 +11,8 @@ namespace ESML {
         [Symbol.toStringTag]: string;
         readonly [key: string]: any;
     }
+
+    type importMap = {
+        imports?: Record<string, string>
+    }
 }

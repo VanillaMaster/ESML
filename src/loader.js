@@ -7,6 +7,9 @@ export class ESMLoader {
     }
     /**@type { Map<string, ESML.module> } */
     #cache = new Map();
+    
+    /**@type { ESML.importMap } */
+    importmap = {};
 
     /**
      * @param { string } request 
@@ -15,7 +18,12 @@ export class ESMLoader {
      */
     import(request, options){
         return new Promise(async (resolve, reject) => {
-            const url = new URL(request, options?.base ?? window.location.href);
+            let url;
+            if (this.importmap.imports?.[request] != undefined) {
+                url = new URL(this.importmap.imports[request], window.location.href);
+            } else {
+                url = new URL(request, options?.base ?? window.location.href);
+            }
             const pending = this.#pendingImports.get(url.href);
             if (pending != undefined) {
                 pending.entries.push({
