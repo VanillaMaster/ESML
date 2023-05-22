@@ -1,4 +1,3 @@
-///@ts-nocheck
 ///<reference lib="WebWorker"/>
 ///<reference lib="es2022" />
 
@@ -101,7 +100,7 @@ self.addEventListener("message", /**@param { MessageEvent<{data: ArrayBuffer, id
 
     //console.time("parse")
     for (const match of text.matchAll(exportExp)) {
-        const parser = new acorn.Parser({
+        const parser = new self.acorn.Parser({
             ecmaVersion: "latest",
             sourceType: "module"
         }, text, match.index);
@@ -111,7 +110,7 @@ self.addEventListener("message", /**@param { MessageEvent<{data: ArrayBuffer, id
     }
 
     for (const match of text.matchAll(importExp)) {
-        const parser = new acorn.Parser({
+        const parser = new self.acorn.Parser({
             ecmaVersion: "latest",
             sourceType: "module"
         }, text, match.index);
@@ -241,7 +240,6 @@ function getImportNames(node, location, imports, namespaceImports, positions) {
 }
 
 /**
- * 
  * @param { acorn.Node } node
  * @param { string } location
  * @param { Record<string, Record<string, string>> } exports
