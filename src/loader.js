@@ -6,23 +6,16 @@ export class ESMLoader {
         this.#parser.addEventListener("message", ESMLoader.onMessage.bind(this));
     }
 
+    #parser = new Worker(new URL("./parser.js", import.meta.url), {type: "module"});
+
     /**@type { Record<string, (this: ESMLoader, response: Response, id: string) => void> } */
     static #mimeBinging = {}
     
     /**@type { Map<string, { entries: { resolve: (value: ESML.module) => void; reject: (reason?: any) => void; }[]; module: ESML.module }> } */
     #pendingImports = new Map();
 
-    #parser = new Worker(new URL("./parser.js", import.meta.url));
-
     /**@type { Map<string, ESML.module> } */
     registry = new Map();
-
-    // #scopes = {
-    //     /**@type { ESML.Scope } */
-    //     global: { [Symbol.toStringTag]: "global" },
-    //     /**@type  {Record<string, ESML.Scope> } */
-    //     local: {}
-    // };
 
     #scopes = {
         /**@type { ESML.Scope } */
@@ -37,29 +30,31 @@ export class ESMLoader {
     getLocalScopeByName(name) {
         return this.#scopes.local[name] ?? (this.#scopes.local[name] = {[Symbol.toStringTag]: name});
     }
+
+    /**
+     * @private
+     * @param { ESML.Scope } scope 
+     * @param { string } name 
+     * @param { string } path 
+     * @param { string[] } scopeNames 
+     */
+    initScope(scope, name, path, scopeNames){
+        const container = scope[name] ?? (scope[name] = []); 
+        const scopes = scopeNames.map( name => this.getLocalScopeByName(name));
+        scopes.push(this.#scopes.global);
+        container.push({
+            path: new URL(path, window.location.href),
+            scopes: scopes
+        });
+    }
     /**@param { Optional<ESML.importMap>  } value*/
     set importmap(value) {
         if (value.imports != undefined) {
             for (const { name, path, scopes: scopeNames } of value.imports) {
-                {
-                    const scope = this.#scopes.global;
-                    const container = scope[name] ?? (scope[name] = []);
-                    const scopes = scopeNames.map( name => this.getLocalScopeByName(name));
-                    scopes.push(this.#scopes.global); 
-                    container.push({
-                        path: new URL(path, window.location.href),
-                        scopes: scopes
-                    });
-                }
+                this.initScope(this.#scopes.global, name, path, scopeNames)
                 for (const scopeName of scopeNames) {
                     const scope = this.getLocalScopeByName(scopeName);
-                    const container = scope[name] ?? (scope[name] = []); 
-                    const scopes = scopeNames.map( name => this.getLocalScopeByName(name));
-                    scopes.push(this.#scopes.global);
-                    container.push({
-                        path: new URL(path, window.location.href),
-                        scopes: scopes
-                    });
+                    this.initScope(scope, name, path, scopeNames);
                 }
             }
         }

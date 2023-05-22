@@ -1,6 +1,27 @@
 namespace ESML {
     declare const META: typeof import("./loader.js").META;
 
+    namespace parser {
+
+        type message = {
+            type: "ready";
+            payload: {};
+        } | {
+            type: "cached";
+            payload: {
+                key: string;
+            }
+        } | {
+            type: "result";
+            payload: {
+                id: string;
+                module: string;
+                dependencies: string[];
+            }
+        }
+        
+    }
+
     type module = {
         [META]: {
             scopes: Scope[];
@@ -46,5 +67,5 @@ namespace ESML {
 }
 
 type Optional<T> = {
-    [K in keyof T]?: T[K]
+    [K in keyof T]?: T[K];
 }

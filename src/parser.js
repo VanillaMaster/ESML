@@ -2,20 +2,86 @@
 ///<reference lib="WebWorker"/>
 ///<reference lib="es2022" />
 
-self.importScripts("https://cdnjs.cloudflare.com/ajax/libs/acorn/8.8.2/acorn.min.js");
+const cacheKeys = new Set();
 
-const DEFAULT_EXPORT_NAME = "__default__"
-const IMPORTS_CONTAINER = "__imports__"
+/**@type { IDBDatabase | Promise<IDBDatabase> } */
+let DB = openCache(1);
+DB.then(db => {
+    const transaction = db.transaction("cache", "readonly");
+    const store = transaction.objectStore("cache");
+    const cursor = store.openCursor();
+    cursor.addEventListener("success", function(e){
+        const cursor = this.result;
+        if (cursor) {
+            cacheKeys.add(cursor.key)
+            cursor.continue();
+        } else {
+            console.log("done");
+        }
+    })
+});
+
+/**
+ * @param { number } version
+ * @returns { Promise<IDBDatabase> }
+ */
+function openCache(version) {
+    return new Promise(function(resolve, reject){
+        const request = self.indexedDB.open("ESML", version);
+        request.addEventListener("success", function(e){
+            resolve(this.result);
+        });
+        request.addEventListener("error", function(e){
+            reject(e)
+        });
+        request.addEventListener("upgradeneeded", function(e){
+            this.result.createObjectStore("cache", { keyPath: "hash" });
+        })
+    })
+}
+
+/**
+ * @param { string } str 
+ * @param { number } [seed] 
+ * @returns { number }
+ */
+function cyrb53 (str, seed = 0) {
+    let h1 = 0xdeadbeef ^ seed, h2 = 0x41c6ce57 ^ seed;
+    for(let i = 0, ch; i < str.length; i++) {
+        ch = str.charCodeAt(i);
+        h1 = Math.imul(h1 ^ ch, 2654435761);
+        h2 = Math.imul(h2 ^ ch, 1597334677);
+    }
+    h1  = Math.imul(h1 ^ (h1 >>> 16), 2246822507);
+    h1 ^= Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+    h2  = Math.imul(h2 ^ (h2 >>> 16), 2246822507);
+    h2 ^= Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  
+    return 4294967296 * (2097151 & h2) + (h1 >>> 0);
+};
+
+import "https://cdnjs.cloudflare.com/ajax/libs/acorn/8.8.2/acorn.min.js";
+
+//self.importScripts("https://cdnjs.cloudflare.com/ajax/libs/acorn/8.8.2/acorn.min.js");
+
+
+const DEFAULT_EXPORT_NAME = "__default__";
+const IMPORTS_CONTAINER = "__imports__";
 
 const exportExp = new RegExp(String.raw`(^|[^\w])export[^\w]`, "g");
 const importExp = new RegExp(String.raw`(^|[^\w])import[^\w]`, "g");
 const commentExp = new RegExp(String.raw`\/\/.*?(\n|$)|\/\*.*?\*\/`, "gs");
 
-self.addEventListener("message", /**@param { MessageEvent<{data: ArrayBuffer, id: number}> } e*/function(e){
+self.addEventListener("message", /**@param { MessageEvent<{data: ArrayBuffer, id: number}> } e*/ async function(e){
     const { data, id } = e.data;
 
-    const text = (/**@type {string} */(String.fromCharCode.apply(undefined, new Uint8Array(data))))
-    .replaceAll(commentExp, "");
+    const raw = /**@type {string} */(String.fromCharCode.apply(undefined, new Uint8Array(data)))
+    console.time("hash");
+    const hash = cyrb53(raw);
+    console.log(cacheKeys);
+    console.timeEnd("hash");
+    console.log(hash);
+    const text = raw.replaceAll(commentExp, "");
 
     /**@type {Record<string, Record<string, string>>} */
     const exports = {};
