@@ -1,5 +1,8 @@
 {
   "devDependencies": {
     "acorn": "^8.8.2"
+  },
+  "dependencies": {
+    "idb": "^7.1.1"
   }
 }

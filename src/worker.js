@@ -1,43 +1,20 @@
 ///<reference lib="WebWorker"/>
 ///<reference lib="es2022" />
+import "https://cdnjs.cloudflare.com/ajax/libs/acorn/8.8.2/acorn.min.js";
+import { DB } from "./cache.js"
 
-const cacheKeys = new Set();
+const cached = new Set();
+{   
+    const transaction =  DB.transaction("cache", "readonly");
+    const store = await transaction.objectStore("cache");
+    let cursor = await store.index("hash").openKeyCursor();
 
-/**@type { IDBDatabase | Promise<IDBDatabase> } */
-let DB = openCache(1);
-DB.then(db => {
-    const transaction = db.transaction("cache", "readonly");
-    const store = transaction.objectStore("cache");
-    const cursor = store.openCursor();
-    cursor.addEventListener("success", function(e){
-        const cursor = this.result;
-        if (cursor) {
-            cacheKeys.add(cursor.key)
-            cursor.continue();
-        } else {
-            console.log("done");
-        }
-    })
-});
-
-/**
- * @param { number } version
- * @returns { Promise<IDBDatabase> }
- */
-function openCache(version) {
-    return new Promise(function(resolve, reject){
-        const request = self.indexedDB.open("ESML", version);
-        request.addEventListener("success", function(e){
-            resolve(this.result);
-        });
-        request.addEventListener("error", function(e){
-            reject(e)
-        });
-        request.addEventListener("upgradeneeded", function(e){
-            this.result.createObjectStore("cache", { keyPath: "hash" });
-        })
-    })
+    while (cursor) {
+        cached.add(cursor.key);
+        cursor = await cursor.continue();
+    }
 }
+  
 
 /**
  * @param { string } str 
@@ -59,11 +36,6 @@ function cyrb53 (str, seed = 0) {
     return 4294967296 * (2097151 & h2) + (h1 >>> 0);
 };
 
-import "https://cdnjs.cloudflare.com/ajax/libs/acorn/8.8.2/acorn.min.js";
-
-//self.importScripts("https://cdnjs.cloudflare.com/ajax/libs/acorn/8.8.2/acorn.min.js");
-
-
 const DEFAULT_EXPORT_NAME = "__default__";
 const IMPORTS_CONTAINER = "__imports__";
 
@@ -71,15 +43,34 @@ const exportExp = new RegExp(String.raw`(^|[^\w])export[^\w]`, "g");
 const importExp = new RegExp(String.raw`(^|[^\w])import[^\w]`, "g");
 const commentExp = new RegExp(String.raw`\/\/.*?(\n|$)|\/\*.*?\*\/`, "gs");
 
-self.addEventListener("message", /**@param { MessageEvent<{data: ArrayBuffer, id: number}> } e*/ async function(e){
+const utf8decoder = new TextDecoder()
+
+self.addEventListener("message", /**@param { MessageEvent<{data: ArrayBuffer, id: string}> } e*/ function(e){
     const { data, id } = e.data;
 
-    const raw = /**@type {string} */(String.fromCharCode.apply(undefined, new Uint8Array(data)))
-    console.time("hash");
+    parse(data, id);
+})
+
+/**
+ * @param { ArrayBuffer } data 
+ * @param { string } id 
+ */
+function parse(data, id){
+    
+    const raw = utf8decoder.decode(data);
+
     const hash = cyrb53(raw);
-    console.log(cacheKeys);
-    console.timeEnd("hash");
-    console.log(hash);
+    if (cached.has(hash)) {
+        self.postMessage({type: "cached", payload: {
+            key: hash
+        }})
+        return;
+    } else {
+        console.log("outdated");
+    }
+
+    console.time("parse time");
+
     const text = raw.replaceAll(commentExp, "");
 
     /**@type {Record<string, Record<string, string>>} */
@@ -186,13 +177,41 @@ self.addEventListener("message", /**@param { MessageEvent<{data: ArrayBuffer, id
 
 
 
-    const module = `//prefix\n${prefix.join("\n\n")}\n//body\n` + body.join("").trim() + `\n//suffix\nreturn {\n    ${suffix.join(",\n    ")}\n}`
+    const module = `//prefix\n"use strict";\n${prefix.join("\n\n")}\n//body\n` + body.join("").trim() + `\n//suffix\nreturn {\n    ${suffix.join(",\n    ")}\n}`
 
     //console.log(module);
     //console.log([...dependencies]);
 
-    self.postMessage({id, module, dependencies: [...dependencies]});
-})
+    const payload = {
+        id,
+        text: module,
+        dependencies: [...dependencies],
+        hash
+    };
+
+    self.postMessage({
+        type: "result",
+        payload
+    });
+    console.timeEnd("parse time");
+
+    updateCache(payload)
+}
+
+/**
+ * @param { (ESML.parser.message & {type: "result"})["payload"] } data 
+ */
+async function updateCache(data){
+    const transaction = await DB.transaction("cache", "readwrite");
+    const store = await transaction.objectStore("cache");
+    let cursor = await store.index("id").openKeyCursor(data.id);
+    while (cursor) {
+        store.delete(cursor.primaryKey)
+        cursor = await cursor.continue();
+    }
+    store.put(data);
+
+}
 
 /**
  * @param { acorn.Node } node 
@@ -352,3 +371,5 @@ function getExportNames(node, location, exports, allExports, positions) {
     }
 }
 
+
+self.postMessage({type: "ready", payload: {}});

@@ -4,6 +4,9 @@
         "target": "ES2022",
         "moduleResolution": "classic",
         "module": "ESNext",
-        "strict": true
+        "strict": true,
+        "paths": {
+            "https://cdn.jsdelivr.net/npm/idb@7/+esm": ["./node_modules/idb/build/entry.d.ts"]
+        }
     }
 }

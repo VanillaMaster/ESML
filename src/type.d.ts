@@ -3,22 +3,23 @@ namespace ESML {
 
     namespace parser {
 
-        type message = {
+        type message = ({
             type: "ready";
             payload: {};
         } | {
             type: "cached";
             payload: {
-                key: string;
+                key: number;
             }
         } | {
             type: "result";
             payload: {
-                id: string;
-                module: string;
+                text: string;
                 dependencies: string[];
+                id: string;
+                hash: number;
             }
-        }
+        })
         
     }
 
