@@ -8,14 +8,19 @@
     <script type="module">
         import { loader } from "../index.js";
         loader.importmap = {
-            imports: {
-                "#a": {
+            imports: [
+                {
+                    name: "#a",
                     path: "./a.js",
-                    scopes: ["scopeName"]
-                }
-                
-            }
+                    scopes: ["scopeName1"]
+                }, {
+                    name: "#aa",
+                    path: "./b.js",
+                    scopes: []
+                },
+            ]
         }
+        //debugger;
         const module = await loader.import("#a");
         console.log(module);
         console.log(loader);

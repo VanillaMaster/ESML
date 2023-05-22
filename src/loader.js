@@ -14,6 +14,16 @@ export class ESMLoader {
 
     #parser = new Worker(new URL("./parser.js", import.meta.url));
 
+    /**@type { Map<string, ESML.module> } */
+    registry = new Map();
+
+    // #scopes = {
+    //     /**@type { ESML.Scope } */
+    //     global: { [Symbol.toStringTag]: "global" },
+    //     /**@type  {Record<string, ESML.Scope> } */
+    //     local: {}
+    // };
+
     #scopes = {
         /**@type { ESML.Scope } */
         global: { [Symbol.toStringTag]: "global" },
@@ -21,16 +31,36 @@ export class ESMLoader {
         local: {}
     };
     
-    /**@type { ESML.importMap } */
-    #importmap = {
-        imports: []
+    /**
+     * @param { string } name 
+     */
+    getLocalScopeByName(name) {
+        return this.#scopes.local[name] ?? (this.#scopes.local[name] = {[Symbol.toStringTag]: name});
     }
     /**@param { Optional<ESML.importMap>  } value*/
     set importmap(value) {
-        for (const key in this.#importmap) {
-            if (value[key] != undefined) {
-                //Object.assign(this.#importmap[key] ?? (this.#importmap[key] = {}), value[key])
-                this.#importmap[key] = value[key];
+        if (value.imports != undefined) {
+            for (const { name, path, scopes: scopeNames } of value.imports) {
+                {
+                    const scope = this.#scopes.global;
+                    const container = scope[name] ?? (scope[name] = []);
+                    const scopes = scopeNames.map( name => this.getLocalScopeByName(name));
+                    scopes.push(this.#scopes.global); 
+                    container.push({
+                        path: new URL(path, window.location.href),
+                        scopes: scopes
+                    });
+                }
+                for (const scopeName of scopeNames) {
+                    const scope = this.getLocalScopeByName(scopeName);
+                    const container = scope[name] ?? (scope[name] = []); 
+                    const scopes = scopeNames.map( name => this.getLocalScopeByName(name));
+                    scopes.push(this.#scopes.global);
+                    container.push({
+                        path: new URL(path, window.location.href),
+                        scopes: scopes
+                    });
+                }
             }
         }
     }
@@ -39,49 +69,27 @@ export class ESMLoader {
      * @private
      * @param { string } request 
      * @param { ESML.module } [parent] 
-     * @returns { readonly [URL, "inherit" | "mapped" | "relative"] }
+     * @returns { readonly [URL, ESML.Scope[], "inherit" | "mapped" | "relative"] }
      */
     resolveModuleInfo(request, parent){
-        if (request in this.#importmap.imports) {
-            const info = this.#importmap.imports[request];
-            return [new URL(info.path , window.location.href), "mapped"]
+
+        for (const scope of (parent?.[META].scopes ?? [this.#scopes.global]) ) {
+            if (request in scope) {
+                const info = scope[request];
+                if (info.length > 1) {
+                    throw new Error("cannot resolve name due to name collision in scope");
+                }
+                const [{ path, scopes }] = info;
+                return [new URL(path , window.location.href), scopes, "mapped"];
+            }
         }
 
         if (parent) {
             const { url } = parent[META];
-            return [new URL(request, url), "inherit"]
+            return [new URL(request, url), parent[META].scopes, "inherit"]
         }
         
-        return [new URL(request, window.location.href), "relative"];
-    }
-
-    /**
-     * @template { "inherit" | "mapped" | "relative" } K
-     * @param { K } type 
-     * @param { string } request
-     * @param { K extends "inherit" ? ESML.module : undefined } parent 
-     */
-    resolveModuleScopes(type, request, parent){
-        switch (type) {
-            case "inherit": {
-                return [ ...(/**@type { ESML.module }*/(parent)[META].scopes)];
-            }
-            case "mapped": {
-                const { scopes: names } = this.#importmap.imports[request];
-                /**@type { ESML.Scope[] } */
-                const scopes = [];
-                for (const name of names) {
-                    scopes.push(this.#scopes.local[name] ?? (this.#scopes.local[name] = {[Symbol.toStringTag]: name}))
-                }
-                scopes.push(this.#scopes.global);
-                return scopes;
-            }
-            case "relative": {
-                return [ this.#scopes.global ]
-            }
-            default:
-                throw new Error("unknown type");
-        }
+        return [new URL(request, window.location.href), [ this.#scopes.global ], "relative"];
     }
     
     /**
@@ -93,10 +101,9 @@ export class ESMLoader {
         return new Promise(async (resolve, reject) => {
 
             const [parent, request, options] = ESMLoader.parseImportArguments(args);
-            const [url, type] = this.resolveModuleInfo(request, parent);
-            const scopes = this.resolveModuleScopes(type, request, parent);
+            const [url, scopes, type] = this.resolveModuleInfo(request, parent);
             //const name = url.pathname.substring(Math.max(url.pathname.lastIndexOf("/"), 0) + 1);
-            const name = type == "mapped"? request : url.href;
+            const name = (type == "mapped"? request : url.href);
 
             //check cache
             for (const scope of scopes) {
@@ -106,7 +113,11 @@ export class ESMLoader {
                         reject("cannot resolve name due to name collision in scope");
                         return;
                     }
-                    const [cached] = modules;
+                    const [{ path: {href: path} }] = modules;
+                    const cached = this.registry.get(path);
+
+                    if (cached == undefined) break;
+
                     if (cached[META].status == "fulfilled") {
                         console.log(`${name}: found in cache`);
                         resolve(cached);
@@ -129,7 +140,7 @@ export class ESMLoader {
                 }
             }
 
-            const id = crypto.randomUUID();
+            const id = url.href;
 
             /**@type { ESML.module } */
             const module = {
@@ -143,10 +154,7 @@ export class ESMLoader {
                 [Symbol.toStringTag]: "module"
             }
 
-            for (const scope of scopes) {
-                const container = scope[name] ?? (scope[name] = []);
-                container.push(module);
-            }
+            this.registry.set(id, module);
 
             console.time(`module (${name}) load time`);
 

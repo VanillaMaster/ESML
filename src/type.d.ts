@@ -37,7 +37,10 @@ namespace ESML {
     }
 
     type Scope = {
-        [name: string]: module[];
+        [name: string]: {
+            path: URL;
+            scopes: Scope[];
+        }[];
         [Symbol.toStringTag]: string;
     }
 }
