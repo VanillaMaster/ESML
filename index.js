@@ -1,5 +1,4 @@
-import { ESMLoader } from "./src/loader.js";
-export { ESMLoader }
+import { Loader } from "./src/loader/Loader.js";
 
-export const loader = await ESMLoader.new();
 
+export const loader = await Loader.new();

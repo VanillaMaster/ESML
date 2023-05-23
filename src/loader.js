@@ -1,5 +1,6 @@
 import { DB } from "./cache.js"
 
+
 export const META = Symbol("meta");
 const AsyncFunction = (async function(){}).constructor;
 
@@ -8,6 +9,7 @@ const props = {
         cacheFirst: false,
     }
 }
+
 
 export class ESMLoader {
     /**
