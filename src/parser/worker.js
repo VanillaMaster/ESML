@@ -1,3 +1,4 @@
+//@ts-nocheck
 import "https://cdnjs.cloudflare.com/ajax/libs/acorn/8.8.2/acorn.min.js";
 
 
