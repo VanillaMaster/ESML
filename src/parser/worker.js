@@ -5,12 +5,10 @@ import "https://cdnjs.cloudflare.com/ajax/libs/acorn/8.8.2/acorn.min.js";
 const DEFAULT_EXPORT_NAME = "__default__";
 const IMPORTS_CONTAINER = "__imports__";
 
-const exportExp = new RegExp(String.raw`(^|[^\w])export[^\w]`, "g");
-const importExp = new RegExp(String.raw`(^|[^\w])import[^\w]`, "g");
-const commentExp = new RegExp(String.raw`\/\/.*?(\n|$)|\/\*.*?\*\/`, "gs");
-
 const utf8decoder = new TextDecoder()
 
+const exportNodeTypes = new Set(["ExportDefaultDeclaration", "ExportAllDeclaration", "ExportNamedDeclaration"])
+const importNodeTypes = new Set(["ImportDeclaration"])
 
 
 self.addEventListener("message",
@@ -38,8 +36,7 @@ function parse(data, id){
     
     const raw = utf8decoder.decode(data);
 
-
-    const text = raw.replaceAll(commentExp, "");
+    const text = raw;//raw.replaceAll(commentExp, "");
 
     /**@type {Record<string, Record<string, string>>} */
     const exports = {};
@@ -57,28 +54,21 @@ function parse(data, id){
     /**@type {Array<[number, number, boolean] | [number, number]>} */
     const positions = [];
 
-    //console.time("parse")
-    for (const match of text.matchAll(exportExp)) {
-        const parser = new self.acorn.Parser({
-            ecmaVersion: "latest",
-            sourceType: "module"
-        }, text, match.index);
-        parser.nextToken();
-        const statement = parser.parseStatement(true, true, {});
-        getExportNames(statement, ".", exports, allExports, positions);
-    }
 
-    for (const match of text.matchAll(importExp)) {
-        const parser = new self.acorn.Parser({
-            ecmaVersion: "latest",
-            sourceType: "module"
-        }, text, match.index);
-        parser.nextToken();
-        const statement = parser.parseStatement(true, true, {});
-        getImportNames(statement, ".", imports, namespaceImports, positions);
-    }
+    const AST = acorn.parse(text, {
+        ecmaVersion: "latest",
+        sourceType: "module"
+    })
 
-    //console.timeEnd("parse");
+    for (const node of AST.body) {
+        if (importNodeTypes.has(node.type)) {
+            getImportNames(node, ".", imports, namespaceImports, positions);
+        }
+
+        if (exportNodeTypes.has(node.type)) {
+            getExportNames(node, ".", exports, allExports, positions);
+        }
+    }
 
     const prefix = [];
     for (const specifier in imports) {

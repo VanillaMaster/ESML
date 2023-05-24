@@ -1,3 +1,4 @@
+///@ts-ignore
 import { openDB, deleteDB, wrap, unwrap } from 'https://cdn.jsdelivr.net/npm/idb@7/+esm';
 
 export const DB = await openDB("ESML", 1, {

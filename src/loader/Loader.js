@@ -23,12 +23,13 @@ const idCache = new Set();
     }
 }
 
-export class Loader{
+export class Loader extends EventTarget{
     /**
      * @param { Parser } parser 
      * @param { Resolver } resolver 
      */
     constructor(parser, resolver){
+        super();
         this.#parser = parser;
         this.#resolver = resolver;
     }
@@ -87,7 +88,7 @@ export class Loader{
         //debugger; 
         return new Promise(async (resolve, reject) => {
             const [parent, request, options] = Loader.parseImportArguments(args);
-            console.time(request)
+            //console.time(request)
             const [url, scopes, type] = this.#resolver.resolveModuleInfo(request, parent);
             //const name = url.pathname.substring(Math.max(url.pathname.lastIndexOf("/"), 0) + 1);
             const name = (type == "mapped"? request : url.href);
@@ -144,15 +145,24 @@ export class Loader{
             }).catch((e)=>{
                 //console.log();
             });
+            this.dispatchEvent(new CustomEvent("fetch"));
 
             if (true) {
                 const transaction = await DB.transaction("cache", "readonly");
                 const store = await transaction.objectStore("cache");
                 const data = await store.index("id").get(id);
                 if (data) {
-                    controller.abort();
                     await this.compileJsModule(data, module)
-                    console.timeEnd(request)
+                    //console.timeEnd(request)
+                    console.log(`got "${id}" from cache`);
+                    if (true) {
+                        const resp = /**@type {Response} */ (await respPromies);
+                        this.reValidateCache(resp, id);
+                    } else {
+                        controller.abort();
+                        this.dispatchEvent(new CustomEvent("fetchend"));
+                    }
+
                     return;
                 }
             }
@@ -162,7 +172,7 @@ export class Loader{
             //console.log(mime);
             if (mime in Loader.#mimeBinging) {
                 await Loader.#mimeBinging[mime].call(this, resp, module);
-                console.timeEnd(request)
+                //console.timeEnd(request)
             } else {
                 reject(`unknown mime type: ${mime}`);
             }
@@ -214,7 +224,35 @@ export class Loader{
 
     }
 
-
+    /**
+     * 
+     * @param { Response } response 
+     * @param { string } id
+     */
+    async reValidateCache(response, id){
+        const buffer = await response.arrayBuffer();
+        this.dispatchEvent(new CustomEvent("fetchend"));
+        const hash = cyrb53_b(buffer);
+        if (!hashCache.has(hash)) {
+            console.time(`(${id}) parsed (revalidation) in`)
+            const data = await this.#parser.parse(buffer);
+            console.timeEnd(`(${id}) parsed (revalidation) in`)
+            
+            const transaction = await DB.transaction("cache","readwrite");
+            const store = transaction.objectStore("cache");
+            let cursor = await store.index("id").openKeyCursor();
+            while (cursor) {
+                store.delete(cursor.primaryKey)
+                cursor = await cursor.continue();
+            }
+            //store.delete([hash, id]);
+            //store.add(Object.assign(data, {hash, id}));
+            Object.assign(data, {hash, id})
+            store.put(data);
+            transaction.commit();
+            this.dispatchEvent(new CustomEvent("update", {detail: { id }}));
+        }
+    }
 
     /**@type { Record<string, (this: Loader, response: Response, module: ESML.module) => void> } */
     static #mimeBinging = {}
@@ -228,6 +266,7 @@ export class Loader{
         async function loadJavaScript(response, module){
             const { id } = module[META];
             const buffer = await response.arrayBuffer();
+            this.dispatchEvent(new CustomEvent("fetchend"));
             //console.time(`module (${id}) parse time`)
             const hash = cyrb53_b(buffer);
             /** @type { {text: string; dependencies: string[];} }*/
@@ -244,7 +283,9 @@ export class Loader{
                     const transaction = await DB.transaction("cache","readwrite");
                     const store = transaction.objectStore("cache");
                     store.delete([hash, id]);
-                    store.add(Object.assign(data, {hash, id}));
+                    Object.assign(data, {hash, id})
+                    store.add(data);
+                    transaction.commit();
                 })
             }
             await this.compileJsModule(data, module);
