@@ -1,6 +1,7 @@
 import { Parser } from "../parser/parser.js";
 import { Resolver } from "../pathResolver/Resolver.js";
-import { META } from "../loader.js";
+
+import { META } from "../Symbol.js";
 
 import { cyrb53_b } from "../utilities.js";
 

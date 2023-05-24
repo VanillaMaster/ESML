@@ -5,29 +5,7 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Document</title>
-    <script type="module">
-        import { loader } from "../index.js";
-        loader.importmap = {
-            imports: [
-                {
-                    name: "#a",
-                    path: "./a.js",
-                    scopes: ["scopeName1"]
-                }, {
-                    name: "#aa",
-                    path: "./b.js",
-                    scopes: []
-                },
-            ]
-        }
-        //debugger;
-        const module = await loader.import("#a");
-        console.log(module);
-        console.log(loader);
-
-        //const moduleb = await loader.import("./b.js");
-        //console.log(moduleb);
-    </script>
+    <script type="module" src="./index.js"></script>
 </head>
 <body>
     

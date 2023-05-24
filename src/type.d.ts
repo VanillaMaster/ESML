@@ -1,5 +1,5 @@
 namespace ESML {
-    declare const META: typeof import("./loader.js").META;
+    declare const META: typeof import("./Symbol").META;
 
     namespace parser {
 

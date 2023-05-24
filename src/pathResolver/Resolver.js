@@ -1,5 +1,4 @@
-import { META } from "../loader.js";
-
+import { META } from "../Symbol.js"; 
 export class Resolver{
     constructor(){}
 
