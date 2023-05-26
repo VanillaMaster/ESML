@@ -244,7 +244,7 @@ export class Loader extends EventTarget{
             const store = transaction.objectStore("cache");
             let cursor = await store.index("id").openKeyCursor(id);
             while (cursor) {
-                console.log("pkey", cursor.primaryKey);
+                //console.log("pkey", cursor.primaryKey);
                 store.delete(cursor.primaryKey)
                 cursor = await cursor.continue();
             }
