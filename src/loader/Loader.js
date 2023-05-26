@@ -152,6 +152,7 @@ export class Loader extends EventTarget{
                 const store = await transaction.objectStore("cache");
                 const data = await store.index("id").get(id);
                 if (data) {
+                    if (data == undefined) debugger;
                     await this.compileJsModule(data, module)
                     //console.timeEnd(request)
                     console.log(`got "${id}" from cache`);
@@ -234,14 +235,16 @@ export class Loader extends EventTarget{
         this.dispatchEvent(new CustomEvent("fetchend"));
         const hash = cyrb53_b(buffer);
         if (!hashCache.has(hash)) {
+            this.dispatchEvent(new CustomEvent("updatestart", {detail: { id }}));
             console.time(`(${id}) parsed (revalidation) in`)
             const data = await this.#parser.parse(buffer);
             console.timeEnd(`(${id}) parsed (revalidation) in`)
             
             const transaction = await DB.transaction("cache","readwrite");
             const store = transaction.objectStore("cache");
-            let cursor = await store.index("id").openKeyCursor();
+            let cursor = await store.index("id").openKeyCursor(id);
             while (cursor) {
+                console.log("pkey", cursor.primaryKey);
                 store.delete(cursor.primaryKey)
                 cursor = await cursor.continue();
             }
@@ -250,7 +253,7 @@ export class Loader extends EventTarget{
             Object.assign(data, {hash, id})
             store.put(data);
             transaction.commit();
-            this.dispatchEvent(new CustomEvent("update", {detail: { id }}));
+            this.dispatchEvent(new CustomEvent("updateend", {detail: { id }}));
         }
     }
 
