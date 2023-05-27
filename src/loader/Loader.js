@@ -195,9 +195,10 @@ export class Loader extends EventTarget{
         for (let i = 0; i < dependencies.length; i++) {
             imports[dependencies[i]] = values[i]
         }
-        
+        /**@type { (__imports__: Record<string, ESML.module>, __self__: ESML.module) => Promise<any>} */
         const execute = AsyncFunction("__imports__", "__self__", data.text);
-        const exports = await execute(imports, module);
+        //Object.defineProperty(execute, "name", { value: "module" });
+        const exports = await execute.call(null, imports, module);
         const _module = /**@type { ESML.module & {[META]: {status: "fulfilled"}} } */ (module);
         
         _module[META].status = "fulfilled";
