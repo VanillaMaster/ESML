@@ -14,7 +14,7 @@ a: acorn
 ## example
 
 ```js
-import { ESMLoader } from "ESML";
+import { Loader } from "ESML";
 const loader = await Loader.new();
 
 const module = await loader.import("./a.js");
