@@ -30,7 +30,6 @@ namespace ESML {
             name: string;
             id: string;
         };
-        [Symbol.toStringTag]: string;
     } & ({
         [META]: {
             status: "pending" | "rejected";

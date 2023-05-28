@@ -7,6 +7,54 @@ import { cyrb53_b } from "../utilities.js";
 
 import { DB } from "../cache.js";
 
+// const registry = new FinalizationRegistry((heldValue) => {
+//     console.log(heldValue);
+// });
+
+/**
+ * @param { any } o 
+ * @returns { o is Object }
+ */
+function isPlainObject(o){
+    if (typeof o !== "object") return false;
+    if (o === null) return false;
+    if (Object.getPrototypeOf(o) !== Object.prototype) return false;
+
+    return true;
+}
+/**
+ * @param { any } o 
+ * @returns { o is string }
+ */
+function isString(o){
+    return typeof o === "string";
+}
+
+/**
+ * @param { any } o 
+ * @returns { o is ESML.module }
+ */
+function isModule(o){
+    return Object.prototype.isPrototypeOf.call(MODULE_PROTO, o);
+}
+
+const MODULE_PROTO = Object.create(null, {
+    [Symbol.toStringTag]: {
+        value: "module",
+        configurable: false,
+        enumerable: false,
+        writable: false
+    }
+});
+
+const MODULE_META_PROTO = Object.create(null, {
+    [Symbol.toStringTag]: {
+        value: "meta",
+        configurable: false,
+        enumerable: false,
+        writable: false
+    }
+})
 
 const AsyncFunction = (async function(){}).constructor;
 const hashCache = new Set();
@@ -60,22 +108,32 @@ export class Loader extends EventTarget{
      * @returns { readonly [ESML.module?, string, ESML.importOptions?] }
      */
     static parseImportArguments(args) {
-        /**@type {ESML.module | undefined} */
-        let parent;
-        /**@type {string} */
-        let request;
-        /**@type {ESML.importOptions | undefined} */
-        let options;
-        if (typeof args[0] == "string") {
-            request = /**@type { String } */ (args[0]);
-            options = /**@type { ESML.importOptions | undefined } */ (args[1]);
-        } else {
-            parent = /**@type { ESML.module } */ (args[0]);
-            request = /**@type { String } */ (args[1]);
-            options = /**@type { ESML.importOptions | undefined } */ (args[2]);
+        if (
+            (args.length === 1 || args.length === 2) &&
+            (isString(args[0])) &&
+            (args[1] === undefined || isPlainObject(args[1]))
+        ) {
+            return [
+                undefined,
+                /**@type { String } */ (args[0]),
+                /**@type { ESML.importOptions | undefined } */ (args[1])
+            ];
         }
-        //console.log(parent, request, options);
-        return [parent, request, options]
+
+        if (
+            (args.length === 2 || args.length === 3) &&
+            (isModule(args[0])) &&
+            (isString(args[1])) &&
+            (args[2] === undefined || isPlainObject(args[2]))
+        ) {
+            return [
+                /**@type { ESML.module } */ (args[0]),
+                /**@type { String } */ (args[1]),
+                /**@type { ESML.importOptions | undefined } */ (args[2])
+            ];
+        }
+
+        throw new Error("unexpected arguments");
     }
 
 
@@ -101,7 +159,7 @@ export class Loader extends EventTarget{
             if (cached) {
                 if (cached[META].status == "fulfilled") {
                     console.log(`${name}: found in cache`);
-                    resolve(cached);
+                    resolve(Object.create(cached));
                     return;
                 }
                 if (cached[META].status == "rejected") {
@@ -118,18 +176,45 @@ export class Loader extends EventTarget{
                     return;
                 }
             }
-            
-            /**@type { ESML.module } */
-            const module = {
+
+            const module = Object.create(MODULE_PROTO, {
                 [META]: {
-                    scopes: scopes,
-                    url: url,
-                    name: name,
-                    status: "pending",
-                    id: id
-                },
-                [Symbol.toStringTag]: "module"
-            }
+                    /**@type { ESML.module[META] } */
+                    value: Object.create(MODULE_META_PROTO, {
+                        scopes: {
+                            value: scopes,
+                            writable: false,
+                            configurable: false,
+                            enumerable: false
+                        },
+                        url: {
+                            value: url,
+                            writable: false,
+                            configurable: false,
+                            enumerable: false
+                        },
+                        name: {
+                            value: name,
+                            writable: false,
+                            configurable: false,
+                            enumerable: false
+                        },
+                        status: {
+                            value: "pending",
+                            writable: true,
+                        },
+                        id: {
+                            value: id,
+                            writable: false,
+                            configurable: false,
+                            enumerable: false
+                        }
+                    }),
+                    enumerable: false,
+                    writable: false,
+                    configurable: false
+                }
+            })
             
             /**@type { { resolve: (value: ESML.module) => void; reject: (reason?: any) => void; }[] }*/
             const container = [];
@@ -191,24 +276,55 @@ export class Loader extends EventTarget{
       
         const values = await Promise.all(dependencies.map( (dependency) => this.import(module, dependency) ));
         /**@type { Record<string, ESML.module> } */
-        const imports = {};
+        const imports = Object.create(null);
         for (let i = 0; i < dependencies.length; i++) {
-            imports[dependencies[i]] = values[i]
+            Object.defineProperty(imports, dependencies[i], {
+                value: values[i],
+                configurable: false,
+                enumerable: false,
+                writable: false
+            })
         }
         /**@type { (__imports__: Record<string, ESML.module>, __self__: ESML.module) => Promise<any>} */
         const execute = AsyncFunction("__imports__", "__self__", data.text);
         //Object.defineProperty(execute, "name", { value: "module" });
-        const exports = await execute.call(null, imports, module);
-        const _module = /**@type { ESML.module & {[META]: {status: "fulfilled"}} } */ (module);
-        
-        _module[META].status = "fulfilled";
-        _module[META].execute = execute;
-        _module[META].exports = exports;
-        _module[META].imports = imports;
+        const exports = Object.assign(Object.create(null), await execute.call(null, imports, module));
+        const meta = module[META];
+        Object.defineProperties(meta,{
+            status: {
+                value: "fulfilled",
+                writable: false,
+                configurable: false,
+                enumerable: false
+            },
+            execute: {
+                value: execute,
+                writable: false,
+                configurable: false,
+                enumerable: false
+            },
+            exports: {
+                value: exports,
+                writable: false,
+                configurable: false,
+                enumerable: false
+            },
+            imports: {
+                value: imports,
+                writable: false,
+                configurable: false,
+                enumerable: false
+            }
+        });
 
         for (const key in exports) {
+            Object.defineProperty(execute,key, {
+                configurable: false,
+                enumerable: false,
+                writable: false
+            });
             Object.defineProperty(module, key, {
-                /**@this { typeof _module } */
+                /**@this { ESML.module & {[META]: {status: "fulfilled"}} } */
                 get() {
                     return this[META].exports[key];
                 },
@@ -221,7 +337,7 @@ export class Loader extends EventTarget{
         this.#pendingModules.delete(module);
 
         for (const { resolve, reject } of container) {
-            resolve(Object.setPrototypeOf({}, module));
+            resolve(Object.create(module));
         }
 
     }

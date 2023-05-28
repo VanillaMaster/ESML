@@ -1,10 +1,25 @@
 import { META } from "../Symbol.js"; 
+
+/**
+ * @param { string } name 
+ */
+function createScope(name) {
+    return Object.create(Object.create(null, {
+        [Symbol.toStringTag]: {
+            value: name,
+            configurable: false,
+            enumerable: false,
+            writable: false
+        }
+    }));
+}
+
 export class Resolver{
     constructor(){}
 
     #scopes = {
         /**@type { ESML.Scope } */
-        global: { [Symbol.toStringTag]: "global" },
+        global: createScope("global"),
         /**@type  {Record<string, ESML.Scope> } */
         local: {}
     };
@@ -15,7 +30,8 @@ export class Resolver{
      * @returns { readonly [URL, ESML.Scope[], "inherit" | "mapped" | "relative"] }
      */
     resolveModuleInfo(request, parent){
-        for (const scope of (parent?.[META].scopes ?? [this.#scopes.global]) ) {
+        const parentScopes = parent?.[META].scopes ?? [this.#scopes.global];
+        for (const scope of parentScopes) {
             if (request in scope) {
                 const info = scope[request];
                 if (info.length > 1) {
@@ -40,7 +56,7 @@ export class Resolver{
      * @param { string } name 
      */
     getLocalScopeByName(name) {
-        return this.#scopes.local[name] ?? (this.#scopes.local[name] = {[Symbol.toStringTag]: name});
+        return this.#scopes.local[name] ?? (this.#scopes.local[name] = createScope(name));
     }
 
     /**
