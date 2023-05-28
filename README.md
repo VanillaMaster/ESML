@@ -3,7 +3,7 @@ esm compatible loader for js
 
 ## FAQ
 q: whats the point ?\
-a: manual controll of module resolution
+a: manual controll over ~~module resolution~~ everything
 
 q: does this shit use eval ?\
 a: kind of (function constuctor)
