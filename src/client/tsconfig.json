@@ -1,0 +1,25 @@
+{
+    "compilerOptions": {
+        "module": "NodeNext",
+        "target": "ES2022",
+        "sourceMap": true,
+        "outDir": "../../dist/client",
+        "strict": true,
+        "noImplicitAny": true,
+        "paths": {},
+        "checkJs": true,
+        "esModuleInterop": true,
+        "allowSyntheticDefaultImports": true,
+        // "rootDir": "."
+        "composite": true,
+        // "lib": ["DOM", "ES2022"],
+    },
+    "include": [
+        "**/*",
+    ],
+    "references": [
+        {
+            "path": "../shared"
+        },
+    ]
+}

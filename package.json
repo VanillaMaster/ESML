@@ -1,0 +1,16 @@
+{
+  "name": "esml",
+  "version": "1.0.0",
+  "description": "",
+  "type": "module",
+  "scripts": {
+    "watch": "tsc --build --watch",
+    "build": "tsc -b"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "typescript": "^5.2.2"
+  }
+}

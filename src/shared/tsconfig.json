@@ -1,0 +1,17 @@
+{
+    "compilerOptions": {
+        "module": "NodeNext",
+        "target": "ES2022",
+        "sourceMap": true,
+        "outDir": "../../dist/shared",
+        "strict": true,
+        "noImplicitAny": true,
+        "paths": {},
+        "checkJs": true,
+        "esModuleInterop": true,
+        "allowSyntheticDefaultImports": true,
+        // "rootDir": ".",
+        "lib": ["ES2022", "webworker"],
+        "composite": true,
+    },
+}
