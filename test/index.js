@@ -1,11 +1,16 @@
 // import { Loader } from "../index.js";
 // const loader = await Loader.new();
 
-import { loader } from "../dist/client/index.js"
-// const loader = await Loader.new();
+import { Loader } from "../dist/client/index.js"
+const loader = await Loader.new();
 console.log(loader);
-const module = await loader.import("./a.js");
-console.log(module);
+
+setTimeout(async () => {
+    console.time("load");
+    const module = await loader.import("./a.js");
+    console.timeEnd("load");
+    console.log(module);
+}, 300);
 
 // loader.importmap = {
 //     imports: [

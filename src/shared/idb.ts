@@ -1,4 +1,4 @@
-import { openDB, DBSchema } from "../../lib/idb/with-async-ittr.js"
+import { openDB, DBSchema } from "/node_modules/idb/with-async-ittr.js"
 
 export type uuid = `${string}-${string}-${string}-${string}-${string}`;
 
@@ -22,7 +22,7 @@ export interface Schema extends DBSchema {
     }
 }
 
-export const dbPromise = openDB<Schema>("pkg", 1, {
+export const database = openDB<Schema>("pkg", 1, {
     upgrade(database, oldVersion, newVersion, transaction, event) {
         const description = database.createObjectStore("description", { keyPath: "id"})
         description.createIndex("url", "url", {unique: true});

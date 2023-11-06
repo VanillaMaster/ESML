@@ -1,19 +1,17 @@
-import * as acorn from "../../lib/acorn.mjs";
-import * as walk from "../../lib/walk.mjs";
+import * as acorn from "/node_modules/acorn/dist/acorn.mjs";
+import * as walk from "/node_modules/acorn-walk/dist/walk.mjs";
 
-import { db, uuid } from "../shared/idbSync.js"
+import { database, uuid } from "../shared/idb.js"
 
+const worker = await navigator.serviceWorker.register("/sw.js", {
+    type: "module",
+    scope: "/",
+    updateViaCache: 'none'
+})
+await navigator.serviceWorker.ready;
 
-Object.defineProperty(window, "__import__", { value: new Proxy({}, {
-    get(target, key: uuid) {
-        console.log(key);
-        return function(specifier: string){
-            return loader.import(specifier, {
-                parent: key,
-            })
-        }
-    }
-}) });
+await worker.active
+const db = await database;
 
 type Module = {
     id: uuid;
@@ -27,18 +25,68 @@ function exception(message?: string | undefined, options?: ErrorOptions | undefi
     throw new Error(message, options);
 }
 
+function createModule(id: uuid, url: URL, dependencies: Module[], ready: Promise<void>): Module {
+    return Object.create(null, {
+        "id": {
+            value: id,
+            configurable: false,
+            writable: false
+        },
+        "url": {
+            value: url,
+            configurable: false,
+            writable: false
+        },
+        "dependencies": {
+            value: dependencies,
+            configurable: false,
+            writable: false
+        },
+        "ready": {
+            value: ready,
+            configurable: false,
+            writable: false
+        },
+        [Symbol.toStringTag]: {
+            value: "Module",
+            configurable: false,
+            writable: false
+        }
+    })
+}
+
 type importOptions = {
     parent?: uuid
 }
 
 export class Loader {
     private constructor(registryInit: Map<string, Module>) {
+        if (Loader.instance) throw new Error();
         this.registry = registryInit;
     }
 
+    // readonly id = crypto.randomUUID();
+
     private registry;
 
+    static {
+        Object.defineProperty(window, "__import__", { value: new Proxy({}, {
+            get(target, key: uuid) {
+                // console.log(key);
+                return function(specifier: string){
+                    return (Loader.instance ?? exception(`attempt to import ${specifier} before loader initialization`)).import(specifier, {
+                        parent: key,
+                    })
+                }
+            }
+        }) });
+    }
+
+    static readonly worker = worker;
+    private static instance: null | Loader = null;
     static async new() {
+        if (this.instance) return this.instance;
+
         const registryInit = new Map<string, Module>();
         const index = new Map<uuid, Module>();
 
@@ -46,21 +94,19 @@ export class Loader {
         const store = transaction.objectStore("description");
         const resp = await store.getAll();
         for (const entry of resp) {
-            index.set(entry.id, {
-                id: entry.id,
-                url: new URL(entry.url),
-                dependencies: [],
-                ready: Promise.resolve()
-            })
+            index.set(entry.id, createModule(
+                entry.id,
+                new URL(entry.url),
+                [],
+                Promise.resolve()
+            ))
         }
         for (const entry of resp) {
             const module = index.get(entry.id) ?? exception("invalid id");
             module.dependencies.push( ...(entry.dependencies.map( id => index.get(id) ?? exception("invalid id"))) );
             registryInit.set(entry.url, module);
         }
-        const instance = new Loader(registryInit);
-        // debugger
-        return instance;
+        return (this.instance = new Loader(registryInit));
     }
 
     async import(specifier: string, params?: importOptions): Promise<unknown> {
@@ -83,13 +129,12 @@ export class Loader {
         }
         // debugger;
         return import(`/pkg/${module.id}`);
-        return;
     }
 
     private prepareModule(specifier: string, params: { parent: URL }): Promise<Module> {
         return new Promise(async (resolve) => {
             const url = new URL(specifier, params.parent);
-            console.log(url.toString());
+            // console.log(url.toString());
             //#region early return
             {
                 const module = this.registry.get(url.href);
@@ -105,13 +150,12 @@ export class Loader {
                 resolve: (value: void | PromiseLike<void>) => void;
                 reject: (reason?: any) => void;
             };
-            
-            const module: Module = {
-                id: crypto.randomUUID(),
-                url: url,
-                dependencies: [],
-                ready: new Promise(function(resolve, reject){ ready.resolve = resolve; ready.reject = reject; }),
-            }
+            const module = createModule(
+                crypto.randomUUID(),
+                url,
+                [],
+                new Promise(function(resolve, reject){ ready.resolve = resolve; ready.reject = reject; }),
+            );
             this.registry.set(url.href, module);
             resolve(module);
             //#region 
@@ -166,7 +210,7 @@ export class Loader {
                     const end = start + 6;
                     body.push(sourceText.substring(offset, start), `__import__["${module.id}"]`);
                     offset = end;
-                    console.log(start, start + 6, sourceText.substring(start, end));
+                    // console.log(start, start + 6, sourceText.substring(start, end));
                     // debugger
                 },
                 ExportAllDeclaration: (node) => {
@@ -198,14 +242,14 @@ export class Loader {
             })
             body.push(sourceText.substring(offset))
             //#endregion
-            debugger
+            // debugger
             const children = await Promise.all(dependencies);
-
+            // debugger
             //#region updating text;
             for (let i = 0; i < children.length; i++) {
-                const module = children[i];
-                body[(i * 2) + 1] = `/pkg/${module.id}`;
-                if (!module.dependencies.includes(module)) module.dependencies.push(module);
+                const child = children[i];
+                body[(i * 2) + 1] = `/pkg/${child.id}`;
+                if (!module.dependencies.includes(child)) module.dependencies.push(child);
             }
             //#endregion
             
@@ -225,7 +269,7 @@ export class Loader {
                         data: new Blob(body, { type: "application/javascript" })
                     })
                 ])
-                debugger
+                // debugger
             }
             //#region 
 
@@ -234,7 +278,7 @@ export class Loader {
     }
 }
 
-
+const a = 5;
 async function parse(input: string, options: any) {
     try {
         return acorn.parse(input, options);
@@ -242,20 +286,3 @@ async function parse(input: string, options: any) {
         return null;
     }
 }
-
-export const loader = await Loader.new();
-
-// (async function() {
-//     const loader = new Loader();
-//     console.log(loader);
-//     const module = await loader.import("./a.js");
-//     console.log(module);
-// })()
-
-const worker = await navigator.serviceWorker.register("/sw.js", {
-    type: "module",
-    scope: "/",
-    updateViaCache: 'none'
-})
-
-console.log(worker);

@@ -1,4 +1,5 @@
 {
+    "extends": "../../tsconfig.importmap.json",
     "compilerOptions": {
         "module": "NodeNext",
         "target": "ES2022",
@@ -6,7 +7,7 @@
         "outDir": "../../dist/worker",
         "strict": true,
         "noImplicitAny": true,
-        "paths": {},
+        // "paths": {},
         "checkJs": true,
         "esModuleInterop": true,
         "allowSyntheticDefaultImports": true,

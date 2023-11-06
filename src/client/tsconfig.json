@@ -1,4 +1,5 @@
 {
+    "extends": "../../tsconfig.importmap.json",
     "compilerOptions": {
         "module": "NodeNext",
         "target": "ES2022",
@@ -6,12 +7,13 @@
         "outDir": "../../dist/client",
         "strict": true,
         "noImplicitAny": true,
-        "paths": {},
+        // "paths": {},
         "checkJs": true,
         "esModuleInterop": true,
         "allowSyntheticDefaultImports": true,
-        // "rootDir": "."
+        // "rootDir": "../",
         "composite": true,
+        
         // "lib": ["DOM", "ES2022"],
     },
     "include": [
