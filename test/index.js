@@ -2,15 +2,13 @@
 // const loader = await Loader.new();
 
 import { Loader } from "../dist/client/index.js"
-const loader = await Loader.new();
+const loader = Loader.new();
 console.log(loader);
 
-setTimeout(async () => {
-    console.time("load");
-    const module = await loader.import("./a.js");
-    console.timeEnd("load");
-    console.log(module);
-}, 300);
+console.time("load");
+const module = await loader.import("./a.js");
+console.timeEnd("load");
+console.log(module);
 
 // loader.importmap = {
 //     imports: [

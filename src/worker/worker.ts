@@ -30,18 +30,37 @@ router.insert("/pkg/:uuid", {
     }
 })
 
-
-self.addEventListener("install", event => {
-    console.log("Service worker installed");
-    self.skipWaiting();
-});
-self.addEventListener("activate", event => {
-    console.log("Service worker activated");
-});
-
 self.addEventListener("fetch", function(e) {
     const { pathname } = new URL(e.request.url);
-    
+    // console.log("fetch", pathname);
+    // e.stopImmediatePropagation();
+    // e.respondWith(fromCache(e.request));
     const { handler, params } = router.lookup(pathname) ?? defaultHandler;
     e.respondWith(handler(e, params ?? defaultParams));
+})
+
+// async function fromCache(request: Request): Promise<Response> {
+//     const cache = await caches.open("pkg/src");
+//     const resp = await cache.match(request);
+//     if (resp) return resp;
+//     return fetch(request);
+// }
+
+
+self.addEventListener('install', function(event) {
+    console.log("Service worker installed");
+    event.waitUntil(self.skipWaiting()); // Activate worker immediately
+});
+
+self.addEventListener('activate', function(event) {
+    console.log("Service worker activated");
+    event.waitUntil(self.clients.claim()); // Become available to all pages
+});
+
+self.addEventListener("push", function(event) {
+    console.log(event, event.data?.text());
+    const text = event.data?.text() ?? "unknown";
+    self.registration.showNotification(text, {
+        body: "body"
+    });
 })

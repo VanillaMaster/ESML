@@ -1,11 +1,10 @@
 import { openDB, DBSchema } from "/node_modules/idb/with-async-ittr.js"
 
-export type uuid = `${string}-${string}-${string}-${string}-${string}`;
 
 export interface Schema extends DBSchema {
     body: {
         value: {
-            id: uuid,
+            id: string,
             data: Blob;
         },
         key: string;
@@ -13,9 +12,9 @@ export interface Schema extends DBSchema {
     },
     description: {
         value: {
-            id: uuid;
+            id: string;
             url: string;
-            dependencies: uuid[]
+            dependencies: string[]
         };
         key: string;
         indexes: { url: string };
