@@ -3,13 +3,14 @@ import * as walk from "/node_modules/acorn-walk/dist/walk.mjs";
 
 import { database as __database } from "../shared/idb.js";
 
+const DYNAMIC_IMPORT_IDENTIFIER = "__import__"; 
+
 const worker = await navigator.serviceWorker.register("/sw.js", {
     type: "module",
     scope: "/",
     updateViaCache: 'none'
 })
 await navigator.serviceWorker.ready;
-
 const database = await __database;
 
 interface ImportAttributes {
@@ -31,22 +32,83 @@ interface ImportOptions<T> {
     resolverCtx?: T
 }
 
-const instance = Symbol("Loader.instance");
+class LoaderMeta {
+    resolve() {
 
-export class Loader {
-    private constructor() {
-        if (Loader[instance]) throw new Error();
     }
+}
+
+type CrawlerState = {
+    loader: Loader,
+    sourceText: string,
+    id: string,
+    url: URL,
+    body: string[],
+    children: Promise<Module>[],
+    offset: number
+}
+
+class Loader {
+    constructor() {
+        
+    }
+
+    static readonly worker = worker;
+
+    private static readonly Crawler = {
+        ImportDeclaration(node: acorn.ImportDeclaration, state: CrawlerState) {
+            const start = node.source.start + 1;
+            const end = node.source.end - 1;
+            state.body.push(state.sourceText.substring(state.offset, start), null as any);
+            state.offset = end;
+            state.children.push(
+                state.loader.prepareModule(state.sourceText.substring(start, end), {
+                    base: state.url
+                })
+            );
+        },
+    
+        ImportExpression(node: acorn.ImportExpression, state: CrawlerState) {
+            const { start } = node;
+            const end = start + 6;
+            state.body.push(state.sourceText.substring(state.offset, start), `${DYNAMIC_IMPORT_IDENTIFIER}["${state.id}"]`);
+            state.offset = end;
+        },
+    
+        ExportAllDeclaration(node: acorn.ExportAllDeclaration, state: CrawlerState) {
+            if (node.source == null) return;
+            const start = node.source.start + 1;
+            const end = node.source.end - 1;
+    
+            state.body.push(state.sourceText.substring(state.offset, start), null as any);
+            state.offset = end;
+            state.children.push(
+                state.loader.prepareModule(state.sourceText.substring(start, end), {
+                    base: state.url
+                })
+            );
+        },
+    
+        ExportNamedDeclaration(node: acorn.ExportNamedDeclaration, state: CrawlerState) {
+            if (node.source == null) return;
+            const start = node.source.start + 1;
+            const end = node.source.end - 1;
+    
+            state.body.push(state.sourceText.substring(state.offset, start), null as any);
+            state.offset = end;
+            state.children.push(
+                state.loader.prepareModule(state.sourceText.substring(start, end), {
+                    base: state.url
+                })
+            );
+        },
+    }
+
     private readonly registry = new Map<string, Module>();
     private readonly url2id = new Map<string, string>();
 
-    static readonly worker = worker;
-    private static [instance]: null | Loader = null
-
-    static new() {
-        if (this[instance]) return this[instance];
-        return (this[instance] = new Loader());
-    }
+    private readonly prepareModuleWIP = new Map<string, Promise<Module>>();
+    private readonly getModuleWIP = new Map<string, Promise<Module | undefined>>();
 
     async import<C = undefined>(specifier: string, params?: ImportOptions<C>): Promise<unknown> {
         let base = new URL(window.location.href);
@@ -79,7 +141,6 @@ export class Loader {
         return this.getModulePhaseOne(id);
     }
 
-    private readonly getModuleWIP = new Map<string, Promise<Module | undefined>>();
     private getModulePhaseOne(id: string): Promise<Module | undefined> {
         {
             const module = this.registry.get(id);
@@ -94,11 +155,13 @@ export class Loader {
         this.getModuleCleanUp(id, modulePromise);
         return modulePromise;
     }
+
     private async getModuleCleanUp(id: string, promise: Promise<Module | undefined>) {
         const module = await promise;
         if (module) this.registry.set(id, module);
         this.getModuleWIP.delete(id);
     }
+
     private async getModulePhaseTwo(id: string): Promise<Module | undefined> {
         const transaction = database.transaction("description", "readonly");
         const store = transaction.objectStore("description");
@@ -116,11 +179,11 @@ export class Loader {
     private prepareModule(specifier: string, params: { base: URL }): Promise<Module> {
         return this.prepareModulePhaseOne(specifier, params);
     }
-    private readonly prepareModuleWIP = new Map<string, Promise<Module>>();
+
     private prepareModulePhaseOne(specifier: string, params: { base: URL }): Promise<Module> {
 
         const url = resolveModuleSpecifier(specifier, params.base);
-        
+
         {
             const id = this.url2id.get(url.href);
             if (id) return Promise.resolve(this.registry.get(id)!);
@@ -199,60 +262,18 @@ export class Loader {
         //#endregion
 
         //#region collecting children info 
-        let offset = 0;
-        const body: Array<string> = [];
-
-        const children: Promise<Module>[] = [];
-        walk.simple(ast, {
-            ImportDeclaration: (node) => {
-                const start = node.source.start + 1;
-                const end = node.source.end - 1;
-                body.push(sourceText.substring(offset, start), null as any);
-                offset = end;
-                children.push(
-                    this.prepareModule(sourceText.substring(start, end), {
-                        base: url
-                    })
-                );
-                // dependencies.push()
-                // debugger
-            },
-            ImportExpression: (node) => {
-                const { start } = node;
-                const end = start + 6;
-                body.push(sourceText.substring(offset, start), `__import__["${id}"]`);
-                offset = end;
-                // console.log(start, start + 6, sourceText.substring(start, end));
-                // debugger
-            },
-            ExportAllDeclaration: (node) => {
-                if (node.source == null) return;
-                const start = node.source.start + 1;
-                const end = node.source.end - 1;
-
-                body.push(sourceText.substring(offset, start), null as any);
-                offset = end;
-                children.push(
-                    this.prepareModule(sourceText.substring(start, end), {
-                        base: url
-                    })
-                );
-            },
-            ExportNamedDeclaration: (node) => {
-                if (node.source == null) return;
-                const start = node.source.start + 1;
-                const end = node.source.end - 1;
-
-                body.push(sourceText.substring(offset, start), null as any);
-                offset = end;
-                children.push(
-                    this.prepareModule(sourceText.substring(start, end), {
-                        base: url
-                    })
-                );
-            }
-        })
-        body.push(sourceText.substring(offset))
+        const state: CrawlerState = {
+            url,
+            id,
+            sourceText,
+            loader: this,
+            offset: 0,
+            body: [],
+            children: []
+        }
+        walk.simple<CrawlerState>(ast, Loader.Crawler, undefined, state);
+        state.body.push(state.sourceText.substring(state.offset));
+        const { children, body } = state;
         //#endregion
 
         //#region updating text
@@ -279,14 +300,6 @@ export class Loader {
                     data: new Blob(body, { type: "application/javascript" })
                 })
             ]);
-            // const cache = await caches.open("pkg/src");
-            // const resp = new Response(new Blob(body, { type: "application/javascript" }), {
-            //     headers: {
-            //         "Content-Length": data.size.toString(),
-            //         "Content-Type": "application/javascript"
-            //     }
-            // });
-            // await cache.put(new URL(`/pkg/${id}`, window.location.origin), resp);
         }
         //#endregion
 
@@ -294,22 +307,24 @@ export class Loader {
     }
 }
 
-function __import__<C = undefined>(specifier: string, options: ImportOptions<C> = {}) {
-    const loader = Loader[instance];
+export const loader = new Loader();
+
+export function dynamicImport<C = undefined>(specifier: string, options: ImportOptions<C> = {}) {
     if (loader === null) throw new Error(`attempt to import ${specifier} before loader initialization`);
-    options.parent ??= __import__.context;
-    __import__.context = undefined;
+    options.parent ??= dynamicImport.context;
+    dynamicImport.context = undefined;
     return loader.import(specifier, options)
 }
-declare namespace __import__ {
+export declare namespace dynamicImport {
     let context: string | undefined;
 }
 
-Object.defineProperty(window, "__import__", {
-    value: new Proxy(__import__, {
-        get(target, key: string, receiver?: unknown) {
-            return Object.hasOwn(target, key) ? Reflect.get(target, key, receiver) :
-            ( (__import__.context = key), __import__ );
+Object.defineProperty(window, DYNAMIC_IMPORT_IDENTIFIER, {
+    value: new Proxy(dynamicImport, {
+        get(target, key: string, receiver: unknown) {
+            if (Object.hasOwn(target, key)) return Reflect.get(target, key, receiver);
+            dynamicImport.context = key;
+            return dynamicImport;
         }
     }),
     configurable: false,
@@ -325,6 +340,6 @@ function parse(input: string, options: any) {
     }
 }
 
-function resolveModuleSpecifier(specifier: string, base: URL): URL{
+function resolveModuleSpecifier(specifier: string, base: URL): URL {
     return new URL(specifier, base);
 }

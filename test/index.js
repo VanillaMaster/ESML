@@ -1,8 +1,7 @@
 // import { Loader } from "../index.js";
 // const loader = await Loader.new();
 
-import { Loader } from "../dist/client/index.js"
-const loader = Loader.new();
+import { loader } from "../dist/client/index.js"
 console.log(loader);
 
 console.time("load");
