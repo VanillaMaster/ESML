@@ -1,5 +1,5 @@
-import { openDB, DBSchema } from "/node_modules/idb/with-async-ittr.js"
-
+// import { openDB, DBSchema } from "/node_modules/idb/with-async-ittr.js";
+import { openDB, DBSchema } from "idb";
 
 export interface Schema extends DBSchema {
     body: {

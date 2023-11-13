@@ -1,5 +1,7 @@
-import * as acorn from "/node_modules/acorn/dist/acorn.mjs";
-import * as walk from "/node_modules/acorn-walk/dist/walk.mjs";
+// import * as acorn from "/node_modules/acorn/dist/acorn.mjs";
+// import * as walk from "/node_modules/acorn-walk/dist/walk.mjs";
+import * as acorn from "acorn";
+import * as walk from "acorn-walk";
 
 import { database as __database } from "../shared/idb.js";
 

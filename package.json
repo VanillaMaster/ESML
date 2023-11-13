@@ -5,11 +5,33 @@
   "type": "module",
   "scripts": {
     "watch": "tsc --build --watch",
-    "build": "tsc -b"
+    "build": "tsc -b",
+    "install": ""
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
+  "files": [
+    "dist/**/*",
+    "tsconfig.json",
+    ""
+  ],
+  "module": "./dist/client/index.js",
+  "types": "./dist/client/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/client/index.js",
+      "types": "./dist/client/index.d.ts"
+    },
+    "./worker": {
+      "import": "./dist/worker/index.js",
+      "types": "./dist/worker/index.d.ts"
+    },
+    "./shared": {
+      "import": "./dist/shared/index.js",
+      "types": "./dist/shared/index.d.ts"
+    }
+  },
   "devDependencies": {
     "typescript": "^5.2.2"
   },

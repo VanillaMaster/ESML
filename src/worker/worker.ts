@@ -1,5 +1,6 @@
 import { database } from "../shared/idb.js"
-import { type RadixRouter, createRouter } from "/node_modules/radix3/dist/index.mjs";
+// import { type RadixRouter, createRouter } from "/node_modules/radix3/dist/index.mjs";
+import { type RadixRouter, createRouter } from "radix3";
 
 declare var self: ServiceWorkerGlobalScope;
 
