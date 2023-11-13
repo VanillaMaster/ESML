@@ -8,8 +8,6 @@ import { asd, default as def2 } from "./b.js"
 
 import {} from "./b.js"
 
-const smth = await import("./f1/foo.js");
-
 console.log(asd, qwe, f2, f3());
 
 //asd

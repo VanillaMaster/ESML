@@ -25,8 +25,10 @@ export default function (){
     return "42"
 };
 
+const smth = await import("./f1/foo.js");
+
 (function(){
-    
+        
 })();
 
 // // Exporting declarations
