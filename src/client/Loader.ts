@@ -2,12 +2,12 @@ import { LoaderMeta } from "./LoaderMeta.js";
 
 import type { Module } from "./types.js";
 
-const worker = await navigator.serviceWorker.register("/sw.js", {
-    type: "module",
-    scope: "/",
-    updateViaCache: 'none'
-})
-await navigator.serviceWorker.ready;
+// const worker = await navigator.serviceWorker.register("/sw.js", {
+//     type: "module",
+//     scope: "/",
+//     updateViaCache: 'none'
+// })
+// await navigator.serviceWorker.ready;
 
 
 export interface ImportAttributes {
@@ -32,7 +32,7 @@ export class Loader extends EventTarget {
         super()
     }
 
-    static readonly worker = worker;
+    // static readonly worker = worker;
 
     readonly meta = new LoaderMeta();
 
