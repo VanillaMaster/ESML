@@ -6,13 +6,13 @@
   "scripts": {
     "watch": "tsc --build --watch",
     "build": "tsc -b",
-    "install": ""
+    "install": "npm run build"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "files": [
-    "dist/**/*",
+    "src/**/*",
     "tsconfig.json",
     "tsconfig.importmap.json"
   ],
