@@ -14,7 +14,7 @@
   "files": [
     "dist/**/*",
     "tsconfig.json",
-    ""
+    "tsconfig.importmap.json"
   ],
   "module": "./dist/client/index.js",
   "types": "./dist/client/index.d.ts",
