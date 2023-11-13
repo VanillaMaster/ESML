@@ -3,7 +3,6 @@ import * as walk from "/node_modules/acorn-walk/dist/walk.mjs";
 
 import { database as __database } from "../shared/idb.js";
 
-import type { Loader } from "./index.js";
 import type { Module } from "./types.js";
 
 const DYNAMIC_IMPORT_IDENTIFIER = "__import__"; 
@@ -88,7 +87,7 @@ export class LoaderMeta {
     constructor() {
     }
 
-    resolve(specifier: string, base: URL, parent: Module | null) {
+    resolve(specifier: string, base: URL, parent: Module | null): URL | PromiseLike<URL> {
         return new URL(specifier, base);
     }
 
@@ -143,7 +142,7 @@ export class LoaderMeta {
 
     private async prepareModulePhaseOne(specifier: string, base: URL, parent: Module | null): Promise<Module> {
 
-        const url = this.resolve(specifier, base, parent);
+        const url = await this.resolve(specifier, base, parent);
 
         {
             const id = this.url2id.get(url.href);
