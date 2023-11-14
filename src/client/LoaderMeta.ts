@@ -93,6 +93,18 @@ export class LoaderMeta {
         return new URL(specifier, base);
     }
 
+    /**
+     * provide an opportunity to override dynamic import call, if bundler mess it up
+     * 
+     * the easiest option is just use function constructor
+     * ```js
+     * loader.meta.dynamicImport = new Function("specifier", "options", "return import(specifier, options);");
+     * ```
+     */
+    dynamicImport(specifier: string, options?: ImportCallOptions): Promise<unknown>{
+        return import(specifier, options);
+    }
+
     readonly registry = new Map<string, Module>();
     readonly url2id = new Map<string, string>();
 
