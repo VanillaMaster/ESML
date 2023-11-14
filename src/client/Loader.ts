@@ -59,8 +59,8 @@ export class Loader extends EventTarget {
                 if (!checked.has(dependency)) toCheck.push(dependency);
             }
         }
-        // debugger
-        return import(`/pkg/${module.id}`);
+        return this.meta.dynamicImport(`/pkg/${module.id}`);
+        // return import(`/pkg/${module.id}`);
     }
 
 }
