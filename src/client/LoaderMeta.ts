@@ -2,12 +2,14 @@
 // import * as walk from "/node_modules/acorn-walk/dist/walk.mjs";
 import * as acorn from "acorn";
 import * as walk from "acorn-walk";
+import crc32 from "../shared/crc32.js";
 
 import { database as __database } from "../shared/idb.js";
 
 import type { Module } from "./types.js";
 
-const DYNAMIC_IMPORT_IDENTIFIER = "__import__"; 
+export const DYNAMIC_IMPORT_IDENTIFIER = "__import__"; 
+const DECODER_OPTIONS = { stream: true };
 
 const database = await __database;
 
@@ -222,13 +224,35 @@ export class LoaderMeta {
         });
 
         const mime = resp.headers.get("Content-type") ?? "application/octet-stream";
+        const contentLength = Number.parseInt(resp.headers.get("Content-Length")!);
+        if (contentLength < 0 || Number.isNaN(contentLength)) {
+            controller.abort();
+            throw new Error("internal error");
+        }
+        if (resp.body == null) {
+            controller.abort();
+            throw new Error("internal error");
+        }
         if (!mime.startsWith("application/javascript")) {
             controller.abort(`Failed to load module script: Expected a JavaScript module script but the server responded with a MIME type of "${mime}". Strict MIME type checking is enforced for module scripts per HTML spec.`);
             throw new TypeError(`Failed to fetch module: ${module.url.toString()}`);
         }
 
-        const sourceText = await resp.text();
+        const decoder = new TextDecoder();
+        const reader = resp.body.getReader();
+        const sourceTextChunks: string[] = [];
+        let crc = undefined;
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            sourceTextChunks.push(decoder.decode(value, DECODER_OPTIONS));
+            crc = crc32(value, crc);
+        }
+        sourceTextChunks.push(decoder.decode());
+
+        const sourceText = sourceTextChunks.join("");
         //#endregion
+
         //#region parse
         const ast = parse(sourceText, {
             ecmaVersion: "latest",
@@ -237,6 +261,7 @@ export class LoaderMeta {
 
         if (ast === null) throw new Error();
         //#endregion
+        
         //#region collecting children info 
         const state: CrawlerState = {
             module: module,
@@ -250,6 +275,7 @@ export class LoaderMeta {
         state.body.push(state.sourceText.substring(state.offset));
         const { children, body } = state;
         //#endregion
+
         //#region updating text
         for (let i = 0, j = 0; i < body.length; i++) {
             if (body[i] != undefined) continue;
@@ -258,6 +284,7 @@ export class LoaderMeta {
             if (!module.dependencies.includes(id)) module.dependencies.push(id);
         }
         //#endregion
+
         //#region seve to idb
         {
             const transaction = database.transaction(["body", "description"], "readwrite");
@@ -268,6 +295,7 @@ export class LoaderMeta {
                     id: module.id,
                     url: module.url.href,
                     dependencies: module.dependencies,
+                    crc: (crc!).toString(16)
                 }),
                 bodyStore.add({
                     id: module.id,

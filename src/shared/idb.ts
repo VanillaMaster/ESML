@@ -14,7 +14,8 @@ export interface Schema extends DBSchema {
         value: {
             id: string;
             url: string;
-            dependencies: string[]
+            dependencies: string[];
+            crc: string;
         };
         key: string;
         indexes: { url: string };

@@ -1,6 +1,6 @@
 import { type ImportOptions, Loader } from "./Loader.js";
 
-const DYNAMIC_IMPORT_IDENTIFIER = "__import__"; 
+import { DYNAMIC_IMPORT_IDENTIFIER } from "./LoaderMeta.js";
 
 export const loader = new Loader();
 

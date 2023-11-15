@@ -2,14 +2,6 @@ import { LoaderMeta } from "./LoaderMeta.js";
 
 import type { Module } from "./types.js";
 
-// const worker = await navigator.serviceWorker.register("/sw.js", {
-//     type: "module",
-//     scope: "/",
-//     updateViaCache: 'none'
-// })
-// await navigator.serviceWorker.ready;
-
-
 export interface ImportAttributes {
     [key: string]: string;
     type: string;

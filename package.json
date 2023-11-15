@@ -27,9 +27,13 @@
       "import": "./dist/worker/index.js",
       "types": "./dist/worker/index.d.ts"
     },
-    "./shared": {
-      "import": "./dist/shared/index.js",
-      "types": "./dist/shared/index.d.ts"
+    "./idb": {
+      "import": "./dist/shared/idb.js",
+      "types": "./dist/shared/idb.d.ts"
+    },
+    "./crc32": {
+      "import": "./dist/shared/crc32.js",
+      "types": "./dist/shared/crc32.d.ts"
     }
   },
   "devDependencies": {
