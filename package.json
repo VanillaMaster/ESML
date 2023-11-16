@@ -12,9 +12,10 @@
   "author": "",
   "license": "ISC",
   "files": [
+    "dist/**/*",
     "src/**/*",
     "tsconfig.json",
-    "tsconfig.importmap.json"
+    "tsconfig.base.json"
   ],
   "module": "./dist/client/index.js",
   "types": "./dist/client/index.d.ts",
