@@ -1,0 +1,13 @@
+{
+    "compilerOptions": {
+        "module": "NodeNext",
+        "target": "ES2022",
+        "sourceMap": true,
+        "declaration": true,
+        "strict": true,
+        "noImplicitAny": true,
+        "checkJs": true,
+        "esModuleInterop": true,
+        "allowSyntheticDefaultImports": true,
+    }
+}

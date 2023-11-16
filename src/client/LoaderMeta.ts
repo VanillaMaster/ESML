@@ -25,7 +25,8 @@ function parse(input: string, options: any) {
 type CrawlerState = {
     self: LoaderMeta,
     sourceText: string,
-    module: Module,
+    // module: Module,
+    url: string,
     body: string[],
     children: Promise<Module>[],
     offset: number
@@ -46,14 +47,14 @@ export class LoaderMeta {
             state.offset = end;
 
             state.children.push(
-                state.self.resolveAndPrepare(state.sourceText.substring(start, end), state.module.url)
+                state.self.resolveAndPrepare(state.sourceText.substring(start, end), state.url)
             );
         },
 
         ImportExpression(node: acorn.ImportExpression, state: CrawlerState) {
             const { start } = node;
             const end = state.sourceText.indexOf("(", start) + 1;
-            state.body.push(state.sourceText.substring(state.offset, start), `${DYNAMIC_IMPORT_IDENTIFIER}("${state.module.url.href}",`);
+            state.body.push(state.sourceText.substring(state.offset, start), `${DYNAMIC_IMPORT_IDENTIFIER}("${state.url}",`);
             state.offset = end;
         },
 
@@ -69,7 +70,7 @@ export class LoaderMeta {
             state.offset = end;
             
             state.children.push(
-                state.self.resolveAndPrepare(state.sourceText.substring(start, end), state.module.url)
+                state.self.resolveAndPrepare(state.sourceText.substring(start, end), state.url)
             );
         },
 
@@ -85,7 +86,7 @@ export class LoaderMeta {
             state.offset = end;
             
             state.children.push(
-                state.self.resolveAndPrepare(state.sourceText.substring(start, end), state.module.url)
+                state.self.resolveAndPrepare(state.sourceText.substring(start, end), state.url)
             );
         },
     };
@@ -207,26 +208,22 @@ export class LoaderMeta {
 
     async createModule(url: string): Promise<Module> {
 
-        const dependencies: string[] = [];
         const uuid = await generateUUID(LoaderMeta.encoder.encode(url), NameSpace_URL);
-        const module: Module = {
+        const dependencies: string[] = [];
+
+        return {
             uuid: uuid,
             url: new URL(url),
             dependencies: dependencies,
-            ready: new Promise<void>(executor),
+            ready: this.loadModule(uuid, url, dependencies),
         }
-        
-        const load = this.loadModule(module);
-        load.then(executor.resolve);
-        load.catch(executor.reject);
-        return module
     }
 
-    private async loadModule(module: Module): Promise<void> {
+    private async loadModule(uuid: string, url: string, dependencies: string[]): Promise<void> {
         //#region fetching
         const controller = new AbortController();
 
-        const resp = await fetch(module.url, {
+        const resp = await fetch(url, {
             signal: controller.signal
         });
 
@@ -242,7 +239,7 @@ export class LoaderMeta {
         }
         if (!mime.startsWith("application/javascript")) {
             controller.abort(`Failed to load module script: Expected a JavaScript module script but the server responded with a MIME type of "${mime}". Strict MIME type checking is enforced for module scripts per HTML spec.`);
-            throw new TypeError(`Failed to fetch module: ${module.url.toString()}`);
+            throw new TypeError(`Failed to fetch module: ${url}`);
         }
 
         const decoder = new TextDecoder();
@@ -271,7 +268,7 @@ export class LoaderMeta {
         
         //#region collecting children info 
         const state: CrawlerState = {
-            module: module,
+            url: url,
             self: this,
             sourceText,
             offset: 0,
@@ -288,7 +285,7 @@ export class LoaderMeta {
             if (body[i] != undefined) continue;
             const { url: { href: url }, uuid } = await children[j++];
             body[i] = `/pkg/${uuid}`;
-            if (!module.dependencies.includes(url)) module.dependencies.push(url);
+            if (!dependencies.includes(url)) dependencies.push(url);
         }
         //#endregion
 
@@ -299,12 +296,12 @@ export class LoaderMeta {
             const descriptionStore = transaction.objectStore("description");
             await Promise.all([
                 descriptionStore.add({
-                    url: module.url.href,
-                    uuid: module.uuid,
-                    dependencies: module.dependencies,
+                    url: url,
+                    uuid: uuid,
+                    dependencies: dependencies,
                 }),
                 bodyStore.add({
-                    uuid: module.uuid,
+                    uuid: uuid,
                     crc: crc,
                     data: new Blob(body, { type: "application/javascript" })
                 })
@@ -313,12 +310,4 @@ export class LoaderMeta {
         //#endregion
         return;
     }
-}
-
-function executor<T>(resolve: (value: T) => void, reject: (reason?: any) => void): void {
-    executor.resolve = resolve; executor.reject = reject;
-}
-declare namespace executor {
-    let resolve: (value: any) => void;
-    let reject: (reason?: any) => void;
 }

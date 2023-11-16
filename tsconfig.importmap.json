@@ -1,8 +1,0 @@
-{
-    "compilerOptions": {
-        "paths": {
-            // "/node_modules/radix3/dist/index.mjs": ["./node_modules/radix3/dist/index.d.ts"],
-            // "/node_modules/*": ["./node_modules/*"]
-        }
-    }
-}
