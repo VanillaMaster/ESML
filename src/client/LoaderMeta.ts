@@ -196,7 +196,7 @@ export class LoaderMeta {
             if (rawModule) {
                 return {
                     url: new URL(rawModule.url),
-                    uuid: rawModule.url,
+                    uuid: rawModule.uuid,
                     dependencies: rawModule.dependencies,
                     ready: Promise.resolve()
                 };
