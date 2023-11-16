@@ -9,7 +9,7 @@ export interface ImportAttributes {
 
 export interface ImportOptions {
     /**
-     * parent's uuid
+     * parent's url
      */
     parent?: string;
     /**
@@ -26,33 +26,35 @@ export class Loader extends EventTarget {
 
     // static readonly worker = worker;
 
-    readonly meta = new LoaderMeta();
+    readonly meta = new LoaderMeta(this);
 
     async import(specifier: string, options?: ImportOptions): Promise<unknown> {
-        let base = new URL(window.location.href);
-        let parent: Module | null = null;
-        if (options?.parent) {
-            const module = await this.meta.getModule(options.parent);
-            if (module == undefined) throw new Error(`parent with id ${options.parent} doesn't exists`);
-            parent = module;
-            base = module.url;
-        }
+        let parent = options?.parent ?? window.location.href;
 
-        const module = await this.meta.prepareModule(specifier, base, parent);
+        const module = await this.meta.resolveAndPrepare(specifier, parent);
         const toCheck = [module];
         const checked = new WeakSet<Module>();
 
         for (const module of toCheck) {
             if (checked.has(module)) continue;
             await module.ready;
-            for (const id of module.dependencies) {
-                const dependency = this.meta.registry.get(id);
+            for (const url of module.dependencies) {
+                const dependency = this.meta.registry.get(url);
                 if (dependency == undefined) continue;
                 if (!checked.has(dependency)) toCheck.push(dependency);
             }
         }
-        return this.meta.dynamicImport(`/pkg/${module.id}`);
+        return this.meta.dynamicImport(`/pkg/${module.uuid}`);
         // return import(`/pkg/${module.id}`);
     }
-
 }
+
+interface LoaderEventMap {
+    "module": CustomEvent<Module>;
+}
+
+export interface Loader {
+    addEventListener<K extends keyof LoaderEventMap>(type: K, listener: (this: Loader, ev: LoaderEventMap[K]) => any, options?: boolean | AddEventListenerOptions): void;
+    addEventListener(type: string, callback: EventListenerOrEventListenerObject | null, options?: boolean | AddEventListenerOptions | undefined): void;
+}
+

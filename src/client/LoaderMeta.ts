@@ -1,12 +1,13 @@
-// import * as acorn from "/node_modules/acorn/dist/acorn.mjs";
-// import * as walk from "/node_modules/acorn-walk/dist/walk.mjs";
 import * as acorn from "acorn";
 import * as walk from "acorn-walk";
+
 import crc32 from "../shared/crc32.js";
+import generateUUID, { NameSpace_URL } from "uuidv5"
 
 import { database as __database } from "../shared/idb.js";
 
 import type { Module } from "./types.js";
+import type { Loader } from "./Loader.js";
 
 export const DYNAMIC_IMPORT_IDENTIFIER = "__import__"; 
 const DECODER_OPTIONS = { stream: true };
@@ -31,6 +32,7 @@ type CrawlerState = {
 }
 
 export class LoaderMeta {
+    private static readonly encoder = new TextEncoder();
 
     private static readonly Crawler = {
         ImportDeclaration(node: acorn.ImportDeclaration, state: CrawlerState) {
@@ -44,14 +46,14 @@ export class LoaderMeta {
             state.offset = end;
 
             state.children.push(
-                state.self.prepareModule(state.sourceText.substring(start, end), state.module.url, state.module)
+                state.self.resolveAndPrepare(state.sourceText.substring(start, end), state.module.url)
             );
         },
 
         ImportExpression(node: acorn.ImportExpression, state: CrawlerState) {
             const { start } = node;
             const end = state.sourceText.indexOf("(", start) + 1;
-            state.body.push(state.sourceText.substring(state.offset, start), `${DYNAMIC_IMPORT_IDENTIFIER}("${state.module.id}", `);
+            state.body.push(state.sourceText.substring(state.offset, start), `${DYNAMIC_IMPORT_IDENTIFIER}("${state.module.url.href}",`);
             state.offset = end;
         },
 
@@ -67,7 +69,7 @@ export class LoaderMeta {
             state.offset = end;
             
             state.children.push(
-                state.self.prepareModule(state.sourceText.substring(start, end), state.module.url, state.module)
+                state.self.resolveAndPrepare(state.sourceText.substring(start, end), state.module.url)
             );
         },
 
@@ -83,16 +85,16 @@ export class LoaderMeta {
             state.offset = end;
             
             state.children.push(
-                state.self.prepareModule(state.sourceText.substring(start, end), state.module.url, state.module)
+                state.self.resolveAndPrepare(state.sourceText.substring(start, end), state.module.url)
             );
         },
     };
 
-    constructor() {
+    constructor(private target: Loader) {
     }
 
-    resolve(specifier: string, base: URL, parent: Module | null): URL | PromiseLike<URL> {
-        return new URL(specifier, base);
+    resolve(specifier: string, parent: string): URL | PromiseLike<URL> {
+        return new URL(specifier, parent);
     }
 
     /**
@@ -108,89 +110,93 @@ export class LoaderMeta {
     }
 
     readonly registry = new Map<string, Module>();
-    readonly url2id = new Map<string, string>();
 
     private readonly prepareModuleWIP = new Map<string, Promise<Module>>();
     private readonly getModuleWIP = new Map<string, Promise<Module | undefined>>();
 
-    getModule(id: string): Promise<Module | undefined> {
-        return this.getModulePhaseOne(id);
+    getModule(url: URL | string) {
+        if (url instanceof URL) ({href: url} = url);
+        return this.getModulePhaseOne(url)
     }
 
-    private getModulePhaseOne(id: string): Promise<Module | undefined> {
+    private getModulePhaseOne(url: string): Promise<Module | undefined> {
         {
-            const module = this.registry.get(id);
+            const module = this.registry.get(url);
             if (module) return Promise.resolve(module);
         }
         {
-            const modulePromise = this.getModuleWIP.get(id);
+            const modulePromise = this.getModuleWIP.get(url);
             if (modulePromise) return modulePromise;
         }
-        const modulePromise = this.getModulePhaseTwo(id);
-        this.getModuleWIP.set(id, modulePromise);
-        this.getModuleCleanUp(id, modulePromise);
+        const modulePromise = this.getModulePhaseTwo(url);
+        this.getModuleWIP.set(url, modulePromise);
+        this.getModuleCleanUp(url, modulePromise);
         return modulePromise;
     }
 
-    private async getModuleCleanUp(id: string, promise: Promise<Module | undefined>) {
+    private async getModuleCleanUp(url: string, promise: Promise<Module | undefined>) {
         const module = await promise;
-        if (module) this.registry.set(id, module);
-        this.getModuleWIP.delete(id);
+        if (module) this.registry.set(url, module);
+        this.getModuleWIP.delete(url);
     }
 
-    private async getModulePhaseTwo(id: string): Promise<Module | undefined> {
+    private async getModulePhaseTwo(url: string): Promise<Module | undefined> {
         const transaction = database.transaction("description", "readonly");
         const store = transaction.objectStore("description");
-        const rawModule = await store.get(id);
+        const rawModule = await store.get(url);
         if (rawModule) {
             return {
-                id: rawModule.id,
                 url: new URL(rawModule.url),
+                uuid: rawModule.uuid,
                 dependencies: rawModule.dependencies,
                 ready: Promise.resolve()
             };
         }
     }
 
-    prepareModule(specifier: string, base: URL, parent: Module | null): Promise<Module> {
-        return this.prepareModulePhaseOne(specifier, base, parent);
+    async resolveAndPrepare(specifier: string, parent: URL | string): Promise<Module> {
+        if (parent instanceof URL) ({href: parent} = parent);
+        const url = await this.resolve(specifier, parent);
+        return this.prepareModule(url, parent);
     }
 
-    private async prepareModulePhaseOne(specifier: string, base: URL, parent: Module | null): Promise<Module> {
+    prepareModule(url: URL | string, parent: URL | string | null): Promise<Module> {
+        if (url instanceof URL) ({href: url} = url);
+        if (parent instanceof URL) ({href: parent} = parent);
+        return this.prepareModulePhaseOne(url, parent);
+    }
 
-        const url = await this.resolve(specifier, base, parent);
+    private prepareModulePhaseOne(url: string, parent: string | null): Promise<Module> {
 
         {
-            const id = this.url2id.get(url.href);
-            if (id) return Promise.resolve(this.registry.get(id)!);
+            const module = this.registry.get(url);
+            if (module) return Promise.resolve(module);
         }
         {
-            const modulePromise = this.prepareModuleWIP.get(url.href);
+            const modulePromise = this.prepareModuleWIP.get(url);
             if (modulePromise) return modulePromise;
         }
         const modulePromise = this.prepareModulePhaseTwo(url);
-        this.prepareModuleWIP.set(url.href, modulePromise);
-        this.prepareModuleCleanUp(url.href, modulePromise);
+        this.prepareModuleWIP.set(url, modulePromise);
+        this.prepareModuleCleanUp(url, modulePromise);
         return modulePromise;
     }
 
     private async prepareModuleCleanUp(url: string, promise: Promise<Module>) {
         const module = await promise;
-        this.registry.set(module.id, module);
-        this.url2id.set(url, module.id);
+        this.registry.set(url, module);
         this.prepareModuleWIP.delete(url);
     }
 
-    private async prepareModulePhaseTwo(url: URL): Promise<Module> {
+    private async prepareModulePhaseTwo(url: string): Promise<Module> {
         {
             const transaction = database.transaction("description", "readonly");
             const store = transaction.objectStore("description");
-            const index = store.index("url");
-            const rawModule = await index.get(url.href);
+            const rawModule = await store.get(url);
             if (rawModule) {
                 return {
-                    id: rawModule.id,
                     url: new URL(rawModule.url),
+                    uuid: rawModule.url,
                     dependencies: rawModule.dependencies,
                     ready: Promise.resolve()
                 };
@@ -199,16 +205,17 @@ export class LoaderMeta {
         return this.createModule(url);
     }
 
-    async createModule(url: URL): Promise<Module> {
+    async createModule(url: string): Promise<Module> {
 
         const dependencies: string[] = [];
-        const id = crypto.randomUUID();
+        const uuid = await generateUUID(LoaderMeta.encoder.encode(url), NameSpace_URL);
         const module: Module = {
-            id: id,
-            url: url,
+            uuid: uuid,
+            url: new URL(url),
             dependencies: dependencies,
             ready: new Promise<void>(executor),
         }
+        
         const load = this.loadModule(module);
         load.then(executor.resolve);
         load.catch(executor.reject);
@@ -241,7 +248,7 @@ export class LoaderMeta {
         const decoder = new TextDecoder();
         const reader = resp.body.getReader();
         const sourceTextChunks: string[] = [];
-        let crc = undefined;
+        let crc: number = <any>undefined;
         while (true) {
             const { done, value } = await reader.read();
             if (done) break;
@@ -279,9 +286,9 @@ export class LoaderMeta {
         //#region updating text
         for (let i = 0, j = 0; i < body.length; i++) {
             if (body[i] != undefined) continue;
-            const { id } = await children[j++];
-            body[i] = `/pkg/${id}`;
-            if (!module.dependencies.includes(id)) module.dependencies.push(id);
+            const { url: { href: url }, uuid } = await children[j++];
+            body[i] = `/pkg/${uuid}`;
+            if (!module.dependencies.includes(url)) module.dependencies.push(url);
         }
         //#endregion
 
@@ -292,13 +299,13 @@ export class LoaderMeta {
             const descriptionStore = transaction.objectStore("description");
             await Promise.all([
                 descriptionStore.add({
-                    id: module.id,
                     url: module.url.href,
+                    uuid: module.uuid,
                     dependencies: module.dependencies,
-                    crc: (crc!).toString(16)
                 }),
                 bodyStore.add({
-                    id: module.id,
+                    uuid: module.uuid,
+                    crc: crc,
                     data: new Blob(body, { type: "application/javascript" })
                 })
             ]);
