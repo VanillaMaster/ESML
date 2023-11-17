@@ -1,7 +1,6 @@
 {
     "extends": "../../tsconfig.base.json",
     "compilerOptions": {
-        "outDir": "../../dist/shared",
         "lib": ["ES2022", "webworker"],
         "composite": true,
     },

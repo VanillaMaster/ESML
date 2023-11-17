@@ -1,12 +1,5 @@
 {
     "extends": "../../tsconfig.base.json",
-    "compilerOptions": {
-        "outDir": "../../dist/client",
-        "composite": true,
-    },
-    "include": [
-        "**/*",
-    ],
     "references": [
         {
             "path": "../shared"

@@ -9,5 +9,8 @@
         "checkJs": true,
         "esModuleInterop": true,
         "allowSyntheticDefaultImports": true,
+        "rootDir": "src",
+        "outDir": "dist",
+        "composite": true,
     }
 }

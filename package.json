@@ -1,50 +1,43 @@
 {
-  "name": "esml",
-  "version": "1.0.0",
-  "description": "",
-  "type": "module",
-  "scripts": {
-    "watch": "tsc --build --watch",
-    "build": "tsc -b",
-    "install": "npm run build"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "files": [
-    "dist/**/*",
-    "src/**/*",
-    "tsconfig.json",
-    "tsconfig.base.json"
-  ],
-  "module": "./dist/client/index.js",
-  "types": "./dist/client/index.d.ts",
-  "exports": {
-    ".": {
-      "import": "./dist/client/index.js",
-      "types": "./dist/client/index.d.ts"
+    "name": "esml",
+    "version": "1.0.0",
+    "private": true,
+    "type": "module",
+    "exports": {
+        ".": {
+            "import": "./dist/client/index.js",
+            "types": "./dist/client/index.d.ts"
+        },
+        "./worker": {
+            "import": "./dist/worker/index.js",
+            "types": "./dist/worker/index.d.ts"
+        },
+        "./idb": {
+            "import": "./dist/shared/idb.js",
+            "types": "./dist/shared/idb.d.ts"
+        },
+        "./crc32": {
+            "import": "./dist/shared/crc32.js",
+            "types": "./dist/shared/crc32.d.ts"
+        }
     },
-    "./worker": {
-      "import": "./dist/worker/index.js",
-      "types": "./dist/worker/index.d.ts"
+    "files": [
+        "dist/**/*"
+    ],
+    "scripts": {
+        "watch": "tsc --build --watch",
+        "build": "tsc --build",
+        "prepare": "tsc --build"
     },
-    "./idb": {
-      "import": "./dist/shared/idb.js",
-      "types": "./dist/shared/idb.d.ts"
+    "license": "ISC",
+    "devDependencies": {
+        "typescript": "^5.2.2"
     },
-    "./crc32": {
-      "import": "./dist/shared/crc32.js",
-      "types": "./dist/shared/crc32.d.ts"
+    "dependencies": {
+        "acorn": "^8.11.2",
+        "acorn-walk": "^8.3.0",
+        "idb": "^7.1.1",
+        "radix3": "^1.1.0",
+        "uuidv5": "github:VanillaMaster/uuidv5#semver:1.0.0"
     }
-  },
-  "devDependencies": {
-    "typescript": "^5.2.2"
-  },
-  "dependencies": {
-    "acorn": "^8.11.2",
-    "acorn-walk": "^8.3.0",
-    "idb": "^7.1.1",
-    "radix3": "^1.1.0",
-    "uuidv5": "github:VanillaMaster/uuidV5"
-  }
 }
